@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet, Text, View } from "react-native";
+import { Button, Dimensions, StyleSheet, Text, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { db } from "@/Config/Firebase";
 import {
@@ -20,6 +20,13 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { router, useLocalSearchParams } from "expo-router";
+import {
+  AdEventType,
+  InterstitialAd,
+  TestIds,
+  useInterstitialAd,
+  useRewardedAd,
+} from "react-native-google-mobile-ads";
 import CallActionBox from "@/components/CallActionBox";
 
 const { width, height } = Dimensions.get("screen");
@@ -34,14 +41,16 @@ const configuration = {
 };
 
 const Call = () => {
-  const [localStream, setLocalStream] = useState<MediaStream | null>();
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>();
-  const [cachedLocalPc, setCachedLocalPc] =
-    useState<RTCPeerConnection | null>();
+  const [localStream, setLocalStream] = useState<MediaStream>();
+  const [remoteStream, setRemoteStream] = useState<MediaStream>();
+  const [cachedLocalPc, setCachedLocalPc] = useState<RTCPeerConnection>();
   const [isMuted, setIsMuted] = useState<boolean>();
   const [isOffCam, setIsOffCam] = useState<boolean>(false);
   const { id } = useLocalSearchParams();
-
+  const { isLoaded, isClosed, load, show } = useRewardedAd(TestIds.REWARDED, {
+    requestNonPersonalizedAdsOnly: true,
+  });
+  const [loaded, setLoaded] = useState<boolean>(false);
   const startLocalStream = async () => {
     let isFront = true;
     const devices = await mediaDevices.getDisplayMedia();
@@ -75,8 +84,9 @@ const Call = () => {
     localPc.addEventListener("icecandidate", (e) => {
       if (!e.candidate) {
         console.log("No candidate yet");
+      } else if (e.candidate !== null) {
+        addDoc(callerCandidatesCollection, e.candidate.toJSON());
       }
-      addDoc(callerCandidatesCollection, e.candidate.toJSON());
     });
     localPc.ontrack = (e: any) => {
       const newStream = new MediaStream();
@@ -122,11 +132,17 @@ const Call = () => {
     }
     const roomRef = doc(db, "room", id);
     await updateDoc(roomRef, { answer: deleteField() });
-
-    setLocalStream(null);
-    setRemoteStream(null);
-    setCachedLocalPc(null);
+    setLocalStream(undefined);
+    setRemoteStream(undefined);
+    setCachedLocalPc(undefined);
     router.back();
+  };
+
+  const showAds = () => {
+    show({ immersiveModeEnabled: true });
+    if (isClosed) {
+      endCall();
+    }
   };
 
   const switchCamera = () => {
@@ -154,15 +170,20 @@ const Call = () => {
   }, []);
 
   useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
     if (id.length > 0 && localStream !== null) {
       startCall(id);
     }
   }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: "red" }}>
       {!remoteStream && (
         <RTCView
-          className="flex-1"
+          style={{ flex: 1 }}
           streamURL={localStream && localStream.toURL()}
           objectFit={"cover"}
         />
@@ -188,7 +209,7 @@ const Call = () => {
           switchCamera={switchCamera}
           toggleMute={toggleMute}
           toggleCamera={toggleCamera}
-          endCall={endCall}
+          endCall={isLoaded == true ? showAds : endCall}
         />
       </View>
     </View>

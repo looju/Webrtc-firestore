@@ -21,7 +21,7 @@ import {
   onSnapshot,
   deleteField,
 } from "firebase/firestore";
-// import * as Clipboard from "expo-clipboard"; i have to rebuild the dev client later
+import * as Clipboard from "expo-clipboard";
 import { nanoid } from "nanoid/non-secure";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -35,6 +35,7 @@ import Animated, {
   ZoomIn,
 } from "react-native-reanimated";
 import Tooltip from "react-native-walkthrough-tooltip";
+import InlineAd from "./InlineAd";
 
 const { width, height } = Dimensions.get("screen");
 
@@ -43,7 +44,7 @@ export default function HomeScreen() {
   const AnimatedIcon = Animated.createAnimatedComponent(Ionicons);
   const AnimatedBtn = Animated.createAnimatedComponent(TouchableOpacity);
   const AnimatedTxt = Animated.createAnimatedComponent(Text);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [roomId, setRoomId] = useState<string>("");
   const router = useRouter();
   const [showTip, setShowTip] = useState(false);
   const onCallOrJoin = () => {
@@ -53,7 +54,7 @@ export default function HomeScreen() {
   };
 
   const checkMeeting = async () => {
-    if (roomId) {
+    if (roomId.length > 0) {
       const roomRef = doc(db, "room", roomId);
       const roomSnapshot = await getDoc(roomRef);
 
@@ -61,6 +62,8 @@ export default function HomeScreen() {
         console.log(`Room ${roomId} does not exist.`);
         Alert.alert("Wait for your instructor to start the meeting.");
         return;
+      } else if (roomSnapshot.exists()) {
+        router.push({ pathname: "/join", params: { id: roomId } });
       }
     } else {
       Alert.alert("Please enter a room Id");
@@ -68,11 +71,12 @@ export default function HomeScreen() {
   };
 
   const copy = async () => {
-    if (roomId !== null) {
+    if (roomId !== "") {
       await Clipboard.setStringAsync(roomId);
       setShowTip(true);
+    } else if (roomId == "") {
+      Alert.alert("Please enter a room Id to copy");
     }
-    Alert.alert("Please enter a roomId to copy");
   };
 
   useEffect(() => {
@@ -82,18 +86,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.main}>
-      <AnimatedTxt
-        style={styles.roomTitle}
-        entering={FadeIn.duration(4000).mass(2)}
-      >
-        Enter Room ID
-      </AnimatedTxt>
+      <Text style={styles.roomTitle}>Enter Room ID</Text>
       <View style={styles.row}>
-        <AnimatedTextInput
+        <TextInput
           style={styles.input}
           value={roomId}
           onChangeText={(text: string) => setRoomId(text)}
-          entering={ZoomIn.duration(2000)}
         />
         <Tooltip
           isVisible={showTip}
@@ -104,34 +102,30 @@ export default function HomeScreen() {
           showChildInTooltip={false}
           disableShadow
         >
-          <AnimatedIcon
+          <Ionicons
             name="copy-outline"
             style={styles.icon}
             size={20}
             onPress={() => copy()}
-            entering={SlideInRight.duration(2000).springify()}
           />
         </Tooltip>
       </View>
 
       <View style={styles.btnView}>
-        <AnimatedBtn
+        <TouchableOpacity
           style={styles.btn}
           onPress={() =>
             router.push({ pathname: "/call", params: { id: roomId } })
           }
-          entering={SlideInDown.duration(2000)}
         >
           <Text style={styles.btnTxt}>Start meeting</Text>
-        </AnimatedBtn>
-        <AnimatedBtn
-          style={styles.btn}
-          onPress={() => checkMeeting()}
-          entering={SlideInDown.duration(2000)}
-        >
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btn} onPress={() => checkMeeting()}>
           <Text style={styles.btnTxt}>Join meeting</Text>
-        </AnimatedBtn>
+        </TouchableOpacity>
       </View>
+      <View style={{ flex: 1 }} />
+      <InlineAd />
     </View>
   );
 }
@@ -143,6 +137,7 @@ const styles = StyleSheet.create({
     padding: 20,
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 40,
   },
   titleContainer: {
     flexDirection: "row",

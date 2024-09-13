@@ -18,6 +18,12 @@ import {
   onSnapshot,
   deleteField,
 } from "firebase/firestore";
+import {
+  AdEventType,
+  InterstitialAd,
+  TestIds,
+  useRewardedAd,
+} from "react-native-google-mobile-ads";
 import { db } from "@/Config/Firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import CallActionBox from "@/components/CallActionBox";
@@ -34,12 +40,16 @@ const configuration = {
 const Join = () => {
   const [localStream, setLocalStream] = useState<MediaStream | null>();
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>();
+  const [loaded, setLoaded] = useState<boolean>(false);
   const [cachedLocalPc, setCachedLocalPc] =
     useState<RTCPeerConnection | null>();
   const [isMuted, setIsMuted] = useState<boolean>();
   const [isOffCam, setIsOffCam] = useState<boolean>(false);
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { isLoaded, isClosed, load, show } = useRewardedAd(TestIds.REWARDED, {
+    requestNonPersonalizedAdsOnly: true,
+  });
 
   async function endCall() {
     if (cachedLocalPc) {
@@ -58,6 +68,12 @@ const Join = () => {
     router.back();
   }
 
+  const showAds = () => {
+    show({ immersiveModeEnabled: true });
+    if (isClosed) {
+      endCall();
+    }
+  };
   const startLocalStream = async () => {
     let isFront = true;
     const devices = await mediaDevices.getDisplayMedia();
@@ -156,6 +172,10 @@ const Join = () => {
   }, []);
 
   useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
     if (localStream) {
       joinCall(id);
     }
@@ -191,7 +211,7 @@ const Join = () => {
           switchCamera={switchCamera}
           toggleMute={toggleMute}
           toggleCamera={toggleCamera}
-          endCall={endCall}
+          endCall={isLoaded ? showAds : endCall}
         />
       </View>
     </View>
